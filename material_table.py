@@ -145,6 +145,8 @@ class MaterialTable:
 		print('Found',len(goodDatasets),'datasets, which satisfied requirements')
 		if len(contains_k) != 0:
 			goodDatasets = contains_k
+		elif require_k:
+			raise KeyError('No k data was found')
 		print('Out of which',len(contains_k),'datasets contain k data')
 		print('Using ' + goodDatasets[0][0])
 		print('Name:',database[goodDatasets[0][0]]['name'])
