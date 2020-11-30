@@ -4,12 +4,13 @@ import io as _io
 import numpy as _np
 import re as _re
 from scipy.interpolate import interp1d as _interp1d
+import scipy.constants as _const
 
 class MaterialTable:
 	'''This class initialises the database, while offering access to specific
 	interpolations on the data. getN(wavelength) returns the n for a specific
-	wavelength, while getK(wavelength) returns k. In both cases wavelength is
-	in units of um'''
+	wavelength, while getEc(wavelength) returns the extinction coeffictent.
+	In both cases wavelength is in units of um'''
 
 	# The object that will contain the datafiles' location
 	library = None
@@ -30,6 +31,11 @@ class MaterialTable:
 		except FileNotFoundError:
 			print('Library file at ./database/parsed_lib.yml was not found')
 
+	@staticmethod
+	def getK(l):
+		'''A function for transforming wavelength in um to wavenumber
+		in um^-1'''
+		return 2*_const.pi/l
 
 	def __init__(self,material,lmin=None,lmax=None,allow_interpolation=True,\
 				 require_k=False):
@@ -40,7 +46,18 @@ class MaterialTable:
 		the refractive index data.
 		require_k is a parameter specifying, whether data for k is also
 		desired. Datasets with k specified as well are always preffered,
-		and if found will be used regardless of require_k'''
+		and if found will be used regardless of require_k. k is the extinction
+		coefficient in this context.'''
+
+		if material == None or material == 'Vacuum':
+			print('Loading custom material: Vacuum')
+			# To remain consistent with instance variables
+			self.datafile = None
+			self.dataN = None
+			self.dataK = None
+			self.getN = lambda l : 1
+			self.getEc = lambda l : 0
+			return # call return so search would not be called
 
 		self.findMaterial(material,lmin,lmax,allow_interpolation,require_k)
 
@@ -53,7 +70,8 @@ class MaterialTable:
 		the refractive index data.
 		require_k is a parameter specifying, whether data for k is also
 		desired. Datasets with k specified as well are always preffered,
-		and if found will be used regardless of require_k'''
+		and if found will be used regardless of require_k. k is the extinction
+		coefficient in this context.'''
 
 		# Check so undefined behaviour is avoided
 		if type(material) != str:
@@ -93,7 +111,8 @@ class MaterialTable:
 		the refractive index data.
 		require_k is a parameter specifying, whether data for k is also
 		desired. Datasets with k specified as well are always preffered,
-		and if found will be used regardless of require_k'''
+		and if found will be used regardless of require_k. k is the extinction
+		coefficient in this context.'''
 
 		if (lmin == None and lmax != None): # Sanitising the input
 			lmin = lmax
@@ -167,15 +186,15 @@ class MaterialTable:
 		if self.dataK == None:
 			def error(l):
 				raise Exception('No data for k was in dataset.')
-			self.getK = error
+			self.getEc = error
 		# Check for the different types of data k and n might be contained in
 		if 'tabulated k' in self.datafile['DATA'][self.dataK]['type']:
 			tabulated = _np.loadtxt(_io.StringIO(self.datafile['DATA'][self.dataK]['data']))
-			self.getK = _interp1d(tabulated[:,0],tabulated[:,1])
+			self.getEc = _interp1d(tabulated[:,0],tabulated[:,1])
 		if 'tabulated nk' in self.datafile['DATA'][self.dataN]['type']:
 			tabulated = _np.loadtxt(_io.StringIO(self.datafile['DATA'][self.dataN]['data']))
 			self.getN = _interp1d(tabulated[:,0],tabulated[:,1])
-			self.getK = _interp1d(tabulated[:,0],tabulated[:,2])
+			self.getEc = _interp1d(tabulated[:,0],tabulated[:,2])
 		elif 'tabulated n' in self.datafile['DATA'][self.dataN]['type']:
 			tabulated = _np.loadtxt(_io.StringIO(self.datafile['DATA'][self.dataN]['data']))
 			self.getN = _interp1d(tabulated[:,0],tabulated[:,1])
@@ -441,6 +460,13 @@ if __name__ == '__main__':
 	test(MaterialTable.retro([0.1]*4)(2),_np.sqrt(172/31))
 	print('9 Exotic: ',end='')
 	test(MaterialTable.exotic([1]*6)(2),_np.sqrt(11/6))
+
+	print('Unit testing custom material: Vacuum')
+	vacuum = MaterialTable('Vacuum')
+	print('Testing n: ',end='')
+	test(vacuum.getN(2),1)
+	print('Testing Ec: ',end='')
+	test(vacuum.getEc(2),0)
 
 	if fails == 0:
 		print('All tests passed')
