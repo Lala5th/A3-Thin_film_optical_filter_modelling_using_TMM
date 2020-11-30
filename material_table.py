@@ -188,7 +188,7 @@ class MaterialTable:
 				raise Exception('No data for k was in dataset.')
 			self.getEc = error
 		# Check for the different types of data k and n might be contained in
-		if 'tabulated k' in self.datafile['DATA'][self.dataK]['type']:
+		elif 'tabulated k' in self.datafile['DATA'][self.dataK]['type']:
 			tabulated = _np.loadtxt(_io.StringIO(self.datafile['DATA'][self.dataK]['data']))
 			self.getEc = _interp1d(tabulated[:,0],tabulated[:,1])
 		if 'tabulated nk' in self.datafile['DATA'][self.dataN]['type']:
