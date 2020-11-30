@@ -1,0 +1,87 @@
+- SHELF: main
+  name: "MAIN - simple inorganic materials"
+  content:
+    - DIVIDER: "Ag - Silver"
+    - BOOK: Ag
+      name: "Ag (Silver)"
+      info: "main/Ag.html"
+      content:
+        - DIVIDER: "Experimental data: bulk, thick film"
+        - PAGE: Johnson
+          name: "Johnson and Christy 1972: n,k 0.188-1.937 µm"
+          data: "main/Ag/Johnson.yml"
+        - PAGE: Yang
+          name: "Yang et al. 2015: n,k 0.270-24.92 µm"
+          data: "main/Ag/Yang.yml"
+        - PAGE: McPeak
+          name: "McPeak et al. 2015: n,k 0.3-1.7 µm"
+          data: "main/Ag/McPeak.yml"
+        - PAGE: Babar
+          name: "Babar and Weaver 2015: n,k 0.2066-12.40 µm"
+          data: "main/Ag/Babar.yml"
+        - PAGE: Wu
+          name: "Wu et al. 2014: n,k 0.29-1.00 µm"
+          data: "main/Ag/Wu.yml"
+        - PAGE: Werner
+          name: "Werner et al. 2009: n,k 0.01759-2.480 µm"
+          data: "main/Ag/Werner.yml"
+        - PAGE: Stahrenberg
+          name: "Stahrenberg et al. 2001: n,k 0.128-0.496 µm"
+          data: "main/Ag/Stahrenberg.yml"
+        - PAGE: Windt
+          name: "Windt et al. 1988: n,k 0.0024-0.1216 µm"
+          data: "main/Ag/Windt.yml"
+        - PAGE: Hagemann
+          name: "Hagemann et al. 1974: n,k 2.48e-6-248 µm"
+          data: "main/Ag/Hagemann.yml"
+        - DIVIDER: "Experimental data: thin film"
+        - PAGE: Ciesielski
+          name: "Ciesielski et al. 2017: Ag/SiO2; n,k 0.191-20.9 µm"
+          data: "main/Ag/Ciesielski.yml"
+        - PAGE: Ciesielski-Ge
+          name: "Ciesielski et al. 2017: Ag/Ge/SiO2; n,k 0.191-20.9 µm"
+          data: "main/Ag/Ciesielski-Ge.yml"
+        - PAGE: Ciesielski-Ni
+          name: "Ciesielski et al. 2017: Ag/Ni/SiO2; n,k 0.191-15.8 µm"
+          data: "main/Ag/Ciesielski-Ni.yml"
+        - DIVIDER: "Models and simulations"
+        - PAGE: Rakic-BB
+          name: "Rakić et al. 1998: Brendel-Bormann model; n,k 0.248-12.4 µm"
+          data: "main/Ag/Rakic-BB.yml"
+        - PAGE: Rakic-LD
+          name: "Rakić et al. 1998: Lorentz-Drude model; n,k 0.248-12.4 µm"
+          data: "main/Ag/Rakic-LD.yml"
+        - PAGE: Werner-DFT
+          name: "Werner et al. 2009: DFT calculations; n,k 0.01759-2.480 µm"
+          data: "main/Ag/Werner-DFT.yml"
+    - DIVIDER: "Al - Aluminium and aluminates"
+    - BOOK: Al
+      name: "Al (Aluminium)"
+      info: "main/Al.html"
+      content:
+        - DIVIDER: "Experimental data"
+        - PAGE: Rakic
+          name: "Rakić 1995: 0.00012399-200 µm"
+          data: "main/Al/Rakic.yml"
+        - PAGE: McPeak
+          name: "McPeak et al. 2015: n,k 0.15-1.7 µm"
+          data: "main/Al/McPeak.yml"
+        - PAGE: Larruquert
+          name: "Larruquert et al. 1996: n,k 0.077-0.1135 µm"
+          data: "main/Al/Larruquert.yml"
+        - PAGE: Ordal
+          name: "Ordal et al. 1988: n,k 0.667-200 µm"
+          data: "main/Al/Ordal.yml"
+        - PAGE: Hagemann
+          name: "Hagemann et al. 1974: n,k 0.00001033-1240 µm"
+          data: "main/Al/Hagemann.yml"
+        - PAGE: Mathewson
+          name: "Mathewson and Myers 1971: n,k 0.496-1.77 µm"
+          data: "main/Al/Mathewson.yml"
+        - DIVIDER: "Models and simulations"
+        - PAGE: Rakic-BB
+          name: "Rakić et al. 1998: Brendel-Bormann model; n,k 0.0620-248 µm"
+          data: "main/Al/Rakic-BB.yml"
+        - PAGE: Rakic-LD
+          name: "Rakić et al. 1998: Lorentz-Drude model; n,k 0.0620-248 µm"
+          data: "main/Al/Rakic-LD.yml"
