@@ -123,7 +123,40 @@ class MaterialTable:
 		return table
 
 
+	@classmethod
+	def fromValue(cls,realN,Ec=0):
+		'''Constructor that allows the creation of a theoretical material
+		with complex refractive index realN + 1j*Ec.'''
+		material = cls()
+		material.getRealN = lambda l : realN
+		material.getEc = lambda l : Ec
+		return material
 
+	@classmethod
+	def fromCsv(cls,fname,skiprows=0,delimiter=',',wavelength_multiplier=1):
+		'''A constructor that allows the loading of a csv datafile.'''
+
+		material = cls()
+
+		data = _np.loadtxt(fname,skiprows=skiprows,delimiter=delimiter)
+		data[:,0]*=wavelength_multiplier
+
+		print('Loaded',fname)
+		print('Dataset range:',data[0,0],'um -',data[-1,0],'um')
+
+		if len(data.shape) != 2:
+			raise ValueError('Loaded data was misshapen.')
+		if data.shape[1] > 3 :
+			print('\33[33mWarning:\33[0m Extraneous columns detected. These were \
+			skipped')
+		if data.shape[1] == 2:
+			print('2 columns detected. Assuming lossless material.')
+			material.getEc = lambda l : 0
+			material.getRealN = _interp1d(data[:,0],data[:,1])
+		else:
+			material.getRealN = _interp1d(data[:,0],data[:,1])
+			material.getEc = _interp1d(data[:,0],data[:,2])
+		return material
 
 	@classmethod
 	def fromMaterial(cls,material,lmin=None,lmax=None,allow_interpolation=True,\
