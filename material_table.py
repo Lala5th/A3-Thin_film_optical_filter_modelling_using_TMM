@@ -8,19 +8,21 @@ import scipy.constants as _const
 
 class MaterialTable:
 	'''This class initialises the database, while offering access to specific
-	interpolations on the data. getN(wavelength) returns the n for a specific
+	interpolations on the data. getRealN(wavelength) returns the n for a specific
 	wavelength, while getEc(wavelength) returns the extinction coeffictent.
 	In both cases wavelength is in units of um'''
 
-	# The object that will contain the datafiles' location
+	# The object that will contain the datafiles' location (i.e. the database manifest)
 	library = None
 
 	@staticmethod
-	def initDatabase():
+	def initDatabase(reload=False):
 		'''This method loads the map for the database'''
 
-		if MaterialTable.library != None:
+		if MaterialTable.library != None and reload:
 			print("Reloading database mapping file.")
+		elif MaterialTable.library != None:
+			return # exit if reload is not required.
 
 		try:
 			with open(r'./database/parsed_lib.yml') as file:
@@ -31,13 +33,100 @@ class MaterialTable:
 		except FileNotFoundError:
 			print('Library file at ./database/parsed_lib.yml was not found')
 
-	@staticmethod
-	def getK(l):
-		'''A function for transforming wavelength in um to wavenumber
-		in um^-1'''
-		return 2*_const.pi/l
+	@classmethod
+	def fromYml(cls,fname):
+		'''Loads a yml file with the same structure as the ones contained in the
+		refractiveindex.info database.'''
+		table = cls() #initialise an empty MaterialTable named table
 
-	def __init__(self,material,lmin=None,lmax=None,allow_interpolation=True,\
+		with open(fname) as file:
+			table.datafile = _yml.full_load(file)
+			print('Loaded yml datafile:',fname)
+
+		dataK_found = False
+		dataN_found = False
+		# Find k and n data and load them
+		for datatable in table.datafile['DATA']:
+			if datatable['type'] == 'tabulated nk':
+				# If both found in same dataset no extra data is needed
+				data = _np.loadtxt(_io.StringIO(datatable['data']))
+				print('Loaded tabulated nk data.')
+				print('Range:',data[0,0],'um -',data[-1,0],'um')
+				if not dataN_found:
+					table.getRealN = _interp1d(data[:,0],data[:,1])
+				else:
+					print ('\33[33mWarning:\33[0m Duplicate n data. Skipped')
+				if not dataK_found:
+					table.getEc = _interp1d(data[:,0],data[:,2])
+				else:
+					print ('\33[33mWarning:\33[0m Duplicate k data. Skipped')
+
+				dataN_found = True
+				dataK_found = True
+
+			elif datatable['type'] == 'tabulated n':
+				if dataN_found:
+					print ('\33[33mWarning:\33[0m Found duplicate n data. Skipped')
+					continue
+
+				data = _np.loadtxt(_io.StringIO(datatable['data']))
+				print('Loaded tabulated n data')
+				print('Range:',data[0,0],'um -',data[-1,0],'um')
+
+				dataN_found = True
+				table.getRealN = _interp1d(data[:,0],data[:,1])
+			elif datatable['type'] == 'tabulated k':
+				if dataK_found:
+					print ('\33[33mWarning:\33[0m Found duplicate k data. Skipped')
+					continue
+
+				data = _np.loadtxt(_io.StringIO(datatable['data']))
+				print('Loaded tabulated k data')
+				print('Range:',data[0,0],'um -',data[-1,0],'um')
+
+				dataK_found = True
+				table.getEc = _interp1d(data[:,0],data[:,1])
+
+			elif 'formula' in datatable['type']:
+				if dataN_found:
+					print ('\33[33mWarning:\33[0m Found duplicate n data. Skipped')
+					continue
+
+				ID = int(_re.search('(?<=formula\ )[0-9]',datatable['type']).group(0)) - 1
+
+				if (ID >= len(MaterialTable.formulae)):
+					raise KeyError('Unknown formula:',datatable['type'])
+
+				print('Loaded',datatable['type'],'data')
+				range = _np.loadtxt(_io.StringIO(datatable['wavelength_range']))
+				coeffs = _np.loadtxt(_io.StringIO(datatable['coefficients']))
+				print('Range:',range[0],'um -',range[1],'um')
+				table.getRealN = MaterialTable.formulae[ID](coeffs,range)
+
+				dataN_found = True
+
+			else:
+				raise ValueError('Unknown type of datatable:',datatable['type'])
+
+
+			if dataN_found and dataK_found:
+				# Check if we are at the end of the dataset
+				if datatable != table.datafile['DATA'][-1]:
+					print('\33[33mWarning:\33[0m Some datatables were skipped \
+					as sufficient data was found before end of file.')
+				break # End loop if all parameters are loaded
+
+		if not dataK_found:
+			print('No k data found. Assuming lossless material')
+			table.getEc = lambda l : 0
+
+		return table
+
+
+
+
+	@classmethod
+	def fromMaterial(cls,material,lmin=None,lmax=None,allow_interpolation=True,\
 				 require_k=False):
 		'''Constructor to create a material table for material. lmin and lmax
 		are optional parameters specifying the limits within which the
@@ -49,17 +138,30 @@ class MaterialTable:
 		and if found will be used regardless of require_k. k is the extinction
 		coefficient in this context.'''
 
-		if material == None or material == 'Vacuum':
-			print('Loading custom material: Vacuum')
-			# To remain consistent with instance variables
-			self.datafile = None
-			self.dataN = None
-			self.dataK = None
-			self.getN = lambda l : 1
-			self.getEc = lambda l : 0
-			return # call return so search would not be called
+		materialTable = cls()
+		materialTable.findMaterial(material,lmin,lmax,allow_interpolation,require_k)
+		return materialTable
 
-		self.findMaterial(material,lmin,lmax,allow_interpolation,require_k)
+	def __init__(self):
+		'''The default constructor should not be called. Use fromMaterial(material,
+		lmin=None,lmax=None,allow_interpolation=True,require_k=False). '''
+		MaterialTable.initDatabase()
+
+	def getRealN(self,l):
+		'''Default function for returning real refractive index. As it was not
+		initialised yet it only throws an error. This function is replaced
+		by proper initialisation.'''
+		raise Exception('The material table was not properly initialised')
+
+	def getEc(self,l):
+		'''Default function for returning extinction coefficient. As it was not
+		initialised yet it only throws an error. This function is replaced
+		by proper initialisation.'''
+		raise Exception('The material table was not properly initialised')
+
+	def getN(self,l):
+		'''Method to get the complex refractive index at a given wavelength l.'''
+		return self.getRealN(l) + 1j*self.getEc(l)
 
 	def findMaterial(self,material,lmin=None,lmax=None,allow_interpolation=True,\
 					 require_k=False):
@@ -72,6 +174,17 @@ class MaterialTable:
 		desired. Datasets with k specified as well are always preffered,
 		and if found will be used regardless of require_k. k is the extinction
 		coefficient in this context.'''
+
+
+		if material == None or material == 'Vacuum':
+			print('Loading custom material: Vacuum')
+			# To remain consistent with instance variables
+			self.datafile = None
+			dataN = None
+			dataK = None
+			self.getRealN = lambda l : 1
+			self.getEc = lambda l : 0
+			return # call return so search would not be called
 
 		# Check so undefined behaviour is avoided
 		if type(material) != str:
@@ -172,41 +285,40 @@ class MaterialTable:
 		if 'division' in database[goodDatasets[0][0]].keys():
 			print('Division:',database[goodDatasets[0][0]]['division'])
 		print('Location: ./database/data/'+database[goodDatasets[0][0]]['data'])
-		print('Dataset type:',goodDatasets[0][3]['DATA'][goodDatasets[0][1]]['type'])
-		print('Dataset range:',goodDatasets[0][2][0],'um -',goodDatasets[0][2][1],'um')
+		print('Datatable type:',goodDatasets[0][3]['DATA'][goodDatasets[0][1]]['type'])
+		print('Datatable range:',goodDatasets[0][2][0],'um -',goodDatasets[0][2][1],'um')
 		if (contains_k == goodDatasets):
 			if(goodDatasets[0][1] != goodDatasets[0][4]):
-				print('Dataset type:',goodDatasets[0][3]['DATA'][goodDatasets[0][4]]['type'])
-				print('Dataset range:',goodDatasets[0][5][0],'um -',goodDatasets[0][5][1],'um')
-		self.dataN = goodDatasets[0][1]
-		self.dataK = goodDatasets[0][4]
+				print('Datatable type:',goodDatasets[0][3]['DATA'][goodDatasets[0][4]]['type'])
+				print('Datatable range:',goodDatasets[0][5][0],'um -',goodDatasets[0][5][1],'um')
+		dataN = goodDatasets[0][1]
+		dataK = goodDatasets[0][4]
 		self.datafile = goodDatasets[0][3]
 
 		# If k dataset is not found error is raised if getK is called
-		if self.dataK == None:
-			def error(l):
-				raise Exception('No data for k was in dataset.')
-			self.getEc = error
+		if dataK == None:
+			self.getEc = lambda l : 0
 		# Check for the different types of data k and n might be contained in
-		elif 'tabulated k' in self.datafile['DATA'][self.dataK]['type']:
-			tabulated = _np.loadtxt(_io.StringIO(self.datafile['DATA'][self.dataK]['data']))
+		elif 'tabulated k' in self.datafile['DATA'][dataK]['type']:
+			tabulated = _np.loadtxt(_io.StringIO(self.datafile['DATA'][dataK]['data']))
 			self.getEc = _interp1d(tabulated[:,0],tabulated[:,1])
-		if 'tabulated nk' in self.datafile['DATA'][self.dataN]['type']:
-			tabulated = _np.loadtxt(_io.StringIO(self.datafile['DATA'][self.dataN]['data']))
-			self.getN = _interp1d(tabulated[:,0],tabulated[:,1])
+		if 'tabulated nk' in self.datafile['DATA'][dataN]['type']:
+			tabulated = _np.loadtxt(_io.StringIO(self.datafile['DATA'][dataN]['data']))
+			self.getRealN = _interp1d(tabulated[:,0],tabulated[:,1])
 			self.getEc = _interp1d(tabulated[:,0],tabulated[:,2])
-		elif 'tabulated n' in self.datafile['DATA'][self.dataN]['type']:
-			tabulated = _np.loadtxt(_io.StringIO(self.datafile['DATA'][self.dataN]['data']))
-			self.getN = _interp1d(tabulated[:,0],tabulated[:,1])
+		elif 'tabulated n' in self.datafile['DATA'][dataN]['type']:
+			tabulated = _np.loadtxt(_io.StringIO(self.datafile['DATA'][dataN]['data']))
+			self.getRealN = _interp1d(tabulated[:,0],tabulated[:,1])
 		else:
-			formulaN = int(_re.search('(?<=formula\ )[0-9]',self.datafile['DATA'][self.dataN]['type']).group(0))
-			coefficients =  _np.loadtxt(_io.StringIO(self.datafile['DATA'][self.dataN]['coefficients']))
-			self.getN = MaterialTable.formulae[formulaN-1](coefficients,goodDatasets[0][2])
+			formulaN = int(_re.search('(?<=formula\ )[0-9]',self.datafile['DATA'][dataN]['type']).group(0))
+			coefficients =  _np.loadtxt(_io.StringIO(self.datafile['DATA'][dataN]['coefficients']))
+			self.getRealN = MaterialTable.formulae[formulaN-1](coefficients,goodDatasets[0][2])
 
 	# Additional function for error handling
 	@staticmethod
 	def isWithinRange(l,range):
-		'''Checks whether the wavelength is within range'''
+		'''Checks whether the wavelength is within range. A supporting method
+		for easier error handling in the different datamodels.'''
 		l = _np.array(l)
 		if not ((range[0] < l).all() and (range[1] > l).all()):
 			raise ValueError('Some of the values are out of dataset range')
@@ -420,8 +532,10 @@ MaterialTable.formulae = [MaterialTable.sellmeier,
 						  MaterialTable.retro,
 						  MaterialTable.exotic]
 
-# Running init code on import
-MaterialTable.initDatabase()
+def getWavenumber(l):
+	'''A function for transforming wavelength in um to wavenumber
+	in um^-1'''
+	return 2*_const.pi/l
 
 if __name__ == '__main__':
 
@@ -432,14 +546,15 @@ if __name__ == '__main__':
 		'''Function to wrap the unit test results. 1e-10 for rounding errors.
 		x is the measured value while e is the expected.'''
 		tests += 1
-		if _np.abs(x-e)  >= 1e-10:
+		if (_np.abs(x-e)  >= 1e-10).any():
 			print('\33[31mFAILED\33[0m')
 			fails += 1
 		else:
 			print('\33[32mPASSED\33[0m')
 
 
-	manganese = MaterialTable('Mn')
+	BK7 = MaterialTable.fromMaterial('BK7')
+	BK7_Schott = MaterialTable.fromYml('./database/data/glass/schott/N-BK7.yml')
 	# Unit test for the formula. The 1e-10 comparison is for floating point rounding errors.
 	print('\nUnit testing the formulae:')
 	print('1 Sellmeier: ',end='')
@@ -461,12 +576,17 @@ if __name__ == '__main__':
 	print('9 Exotic: ',end='')
 	test(MaterialTable.exotic([1]*6)(2),_np.sqrt(11/6))
 
-	print('Unit testing custom material: Vacuum')
-	vacuum = MaterialTable('Vacuum')
+	print('\nUnit testing custom material: Vacuum')
+	vacuum = MaterialTable.fromMaterial('Vacuum')
 	print('Testing n: ',end='')
-	test(vacuum.getN(2),1)
+	test(vacuum.getRealN(2),1)
 	print('Testing Ec: ',end='')
 	test(vacuum.getEc(2),0)
+
+	print('\nUnit testing fromYml using BK7 (SCHOTT):')
+	wavelengths = [0.5,0.6,0.7,0.8,0.9,1]
+	print('Testing complex n at [0.5,0.6,0.7,0.8,0.9,1]: ',end='')
+	test(BK7.getN(wavelengths),BK7_Schott.getN(wavelengths))
 
 	if fails == 0:
 		print('All tests passed')
