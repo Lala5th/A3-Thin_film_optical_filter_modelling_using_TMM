@@ -130,6 +130,7 @@ class MaterialTable:
 		material = cls()
 		material.getRealN = lambda l : realN
 		material.getEc = lambda l : Ec
+		print('Created material with n =',n,'and k =',Ec)
 		return material
 
 	@classmethod

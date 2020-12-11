@@ -138,6 +138,84 @@ class TransferMatrix:
 		ret = _np.array(ret)
 		return _np.squeeze(ret)
 
+	def trackSingleBeam(self,interfaces,l,theta,p):
+		'''Tracks a single beam through the stack. The interfaces array
+		contains the interfaces on which it reflects.'''
+
+		interfaces = _np.array(interfaces,ndmin=1)
+
+		# Check for sane input
+		for interface in interfaces:
+			interface = _np.array(interface,ndmin=1)
+			if len(interface) != 0:
+				if interface.max() >= len(self._stack) or interface.min() < -1:
+					raise ValueError('Invalid interface number encountered.')
+			prev = -5 # Previous interface location
+			forward = True # Whether the beam is forward propagating
+			for i in interface:
+				if forward and prev >= i:
+					raise ValueError('Unable to perform calculation. No route found')
+				elif not forward and prev <= i:
+					raise ValueError('Unable to perform calculation. No route found')
+				prev = i
+				forward = not forward
+
+		k0 =  _mtbl.getWavenumber(l)
+		propagationMatrix = [self.getPropagationMatrix(i,l,theta,k0) for i in range(len(self._stack))]
+		interfacialMatrix = [self.getInterfacialMatrix(i,l,theta,p,k0) for i in range(len(self._stack))]
+		interfacialMatrix.insert(0,self.getInterfacialMatrix(-1,l,theta,p,k0))
+
+		beams = []
+		for interface in interfaces:
+			loc = -1 # To track the location
+			forward = True # To track propagation direction
+			beam = 1 # To track the phase and amplitude of the beam
+			interface = _np.append(interface,len(self._stack)+1) # So that the escape from the stack can be evaluated
+			interface = _np.array(interface,ndmin=1)
+			for i in interface:
+				while True:
+					if loc == i:
+						break
+					if (loc == -1 and (not forward)) or (loc == len(self._stack) and forward):
+						break
+					if forward:
+						r = -beam*interfacialMatrix[loc+1][1,0]/interfacialMatrix[loc+1][1,1]
+						beam = beam*interfacialMatrix[loc+1][0,0] + r*interfacialMatrix[loc+1][0,1]
+						loc += 1
+						if loc != len(self._stack):
+							beam *= propagationMatrix[loc][0,0]
+					else:
+						beam = beam/interfacialMatrix[loc+1][1,1]
+						loc -= 1
+						if loc != -1:
+							beam /= propagationMatrix[loc][1,1]
+					if (loc == -1 and (not forward)) or (loc == len(self._stack) and forward):
+						break
+				if (loc == -1 and (not forward)) or (loc == len(self._stack) and forward):
+					break
+				if forward:																		# [a b][i] [t]
+					beam = -beam*interfacialMatrix[loc+1][1,0]/interfacialMatrix[loc+1][1,1]	# [c d][r] [0]
+					forward = False
+					if(loc != -1):
+						beam /= propagationMatrix[loc][1,1]										# [a 0]  [0] [0]
+						loc -= 1																# [0 a/] [0] [i]
+						continue
+					else:
+						break
+				else:																			# [a b][0] [r]
+					beam = interfacialMatrix[loc+1][0,1]*beam/interfacialMatrix[loc+1][1,1]		# [c d][t] [i]
+					forward = True
+					if(loc != len(self._stack)):
+						beam *= propagationMatrix[loc][0,0]
+						loc += 1
+						continue
+					else:
+						break
+
+			beams.append(beam)
+
+		return _np.array(beams)
+
 
 if __name__ == '__main__':
 
@@ -148,7 +226,7 @@ if __name__ == '__main__':
 		'''Function to wrap the unit test results. 1e-10 for rounding errors.
 		x is the measured value while e is the expected.'''
 		tests += 1
-		if (_np.abs(x-e)  >= 1e-10).any():
+		if (_np.abs(x-e)  >= 1e-6).any():
 			print('\33[31mFAILED\33[0m')
 			fails += 1
 		else:
@@ -158,32 +236,23 @@ if __name__ == '__main__':
 	propagationMatrixTest = TransferMatrix([vacuum,vacuum,vacuum],[1])
 	print('Testing propagation matrix: ',end='')
 	test(propagationMatrixTest.getPropagationMatrix(0,2*_const.pi,0),_np.array([[_np.exp(1j),0],[0,_np.exp(-1j)]]))
+	print('\nTesting single beam tracking')
+	BK7 = _mtbl.MaterialTable.fromMaterial('BK7')
+	print('Single reflection BK7 substrate:',end='')
+	TM0 = TransferMatrix([vacuum,BK7],[])
+	test(TM0.solveTransmission(0.5,0,True)[0],_np.abs(TM0.trackSingleBeam(-1,0.5,0,True))**2)
+	print('Single reflection BK7 substrate, vacuum layer:',end='')
+	TM1 = TransferMatrix([vacuum,vacuum,BK7],[1])
+	test(TM1.solveTransmission(0.5,0,True)[0],_np.abs(TM1.trackSingleBeam(0,0.5,0,True))**2)
+	print('Single reflection BK7 layer, vacuum layer interface:',end='')
+	TM2 = TransferMatrix([vacuum,vacuum,BK7,BK7],[1,1])
+	test(TM2.solveTransmission(0.5,0,True)[0],_np.abs(TM2.trackSingleBeam(0,0.5,0,True))**2)
+	print('Single reflection BK7 substrate, 2 vacuum layers:',end='')
+	TM2A = TransferMatrix([vacuum,vacuum,vacuum,BK7],[1,1])
+	test(TM2A.solveTransmission(0.5,0,True)[0],_np.abs(TM2A.trackSingleBeam(1,0.5,0,True))**2)
 
 	print()
 	if fails == 0:
 		print('All tests passed')
 	else:
 		print(fails,'tests failed out of',tests)
-
-
-	import matplotlib.pyplot as plt
-	plt.ion()
-
-	# Task 10
-
-	air = _mtbl.MaterialTable.fromMaterial('air')
-	gold = _mtbl.MaterialTable.fromMaterial('Au')
-	BK7 = _mtbl.MaterialTable.fromMaterial('BK7')
-
-	transferredI = []
-	wavelengths = _np.arange(0.4,1,0.001)
-	for i in range(1,11):
-		TM = TransferMatrix([air,gold,BK7],i*10*1e-3)
-		transferredI.append([i*10,TM.solveTransmission(wavelengths,0,True)])
-
-	transferredI = _np.array(transferredI)
-
-	for i in range(len(transferredI)):
-		plt.plot(wavelengths,transferredI[i,1][:,1],label=str(transferredI[i,0])+'nm')
-	plt.legend()
-	plt.show()
