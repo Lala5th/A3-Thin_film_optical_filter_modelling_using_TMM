@@ -18,6 +18,9 @@ class TransferMatrix:
 		materials = _np.array(materials,ndmin=1)
 		thicknesses = _np.array(thicknesses,ndmin=1)
 
+		if (thicknesses <= 0).any():
+			raise ValueError('The layer thicknesses must be strictly positive')
+
 		# Check if materials contains exactly 2 more elements than thicnesses
 		# as the world and substrate do not have thickness
 		if len(materials) - 2 != len(thicknesses):
@@ -107,10 +110,12 @@ class TransferMatrix:
 
 		return transferMatrix
 
-	def solveTransmission(self,lambdas,thetas,ps):
+	def solveTransmission(self,lambdas,thetas,ps,complex=False):
 		'''Method for returning the transmission and reflection of the stack.
 		returns a len(lambdas)*len(thetas)*len(ps)*2 shaped array. Extraneous
-		nesting is discarded via numpy.squeeze (i.e. [[[5,3]]] -> [5,3]).'''
+		nesting is discarded via numpy.squeeze (i.e. [[[5,3]]] -> [5,3]).
+		The complex parameter is optional and if set to True returns the
+		transmitted complex wave amplitude instead of the intensity.'''
 
 		lambdas = _np.array(lambdas,ndmin=1)
 		thetas = _np.array(thetas,ndmin=1)
@@ -130,15 +135,18 @@ class TransferMatrix:
 					r = - transferMatrix[1,0]/transferMatrix[1,1]
 					t =  transferMatrix[0,0] + transferMatrix[0,1]*r
 
-					R = _np.real(r)**2 + _np.imag(r)**2
-					T = _np.real(t)**2 + _np.imag(t)**2
-					pVals.append((R,T))
+					if complex:
+						pVals.append((r,t))
+					else:
+						R = _np.real(r)**2 + _np.imag(r)**2
+						T = _np.real(t)**2 + _np.imag(t)**2
+						pVals.append((R,T))
 				thetaVals.append(pVals)
 			ret.append(thetaVals)
 		ret = _np.array(ret)
 		return _np.squeeze(ret)
 
-	def trackSingleBeam(self,interfaces,l,theta,p):
+	def trackSingleBeam(self,interfaces,lambdas,theta,p):
 		'''Tracks a single beam through the stack. The interfaces array
 		contains the interfaces on which it reflects.'''
 
@@ -160,61 +168,67 @@ class TransferMatrix:
 				prev = i
 				forward = not forward
 
-		k0 =  _mtbl.getWavenumber(l)
-		propagationMatrix = [self.getPropagationMatrix(i,l,theta,k0) for i in range(len(self._stack))]
-		interfacialMatrix = [self.getInterfacialMatrix(i,l,theta,p,k0) for i in range(len(self._stack))]
-		interfacialMatrix.insert(0,self.getInterfacialMatrix(-1,l,theta,p,k0))
+		ret = []
+		lambdas = _np.array(lambdas,ndmin=1)
+		for l in lambdas:
 
-		beams = []
-		for interface in interfaces:
-			loc = -1 # To track the location
-			forward = True # To track propagation direction
-			beam = 1 # To track the phase and amplitude of the beam
-			interface = _np.append(interface,len(self._stack)+1) # So that the escape from the stack can be evaluated
-			interface = _np.array(interface,ndmin=1)
-			for i in interface:
-				while True:
-					if loc == i:
-						break
+			k0 =  _mtbl.getWavenumber(l)
+			propagationMatrix = [self.getPropagationMatrix(i,l,theta,k0) for i in range(len(self._stack))]
+			interfacialMatrix = [self.getInterfacialMatrix(i,l,theta,p,k0) for i in range(len(self._stack))]
+			interfacialMatrix.insert(0,self.getInterfacialMatrix(-1,l,theta,p,k0))
+
+			beams = []
+			for interface in interfaces:
+				loc = -1 # To track the location
+				forward = True # To track propagation direction
+				beam = 1 # To track the phase and amplitude of the beam
+				interface = _np.append(interface,len(self._stack)+1) # So that the escape from the stack can be evaluated
+				interface = _np.array(interface,ndmin=1)
+				for i in interface:
+					while True:
+						if loc == i:
+							break
+						if (loc == -1 and (not forward)) or (loc == len(self._stack) and forward):
+							break
+						if forward:
+							r = -beam*interfacialMatrix[loc+1][1,0]/interfacialMatrix[loc+1][1,1]
+							beam = beam*interfacialMatrix[loc+1][0,0] + r*interfacialMatrix[loc+1][0,1]
+							loc += 1
+							if loc != len(self._stack):
+								beam *= propagationMatrix[loc][0,0]
+						else:
+							beam = beam/interfacialMatrix[loc+1][1,1]
+							loc -= 1
+							if loc != -1:
+								beam /= propagationMatrix[loc][1,1]
+						if (loc == -1 and (not forward)) or (loc == len(self._stack) and forward):
+							break
 					if (loc == -1 and (not forward)) or (loc == len(self._stack) and forward):
 						break
-					if forward:
-						r = -beam*interfacialMatrix[loc+1][1,0]/interfacialMatrix[loc+1][1,1]
-						beam = beam*interfacialMatrix[loc+1][0,0] + r*interfacialMatrix[loc+1][0,1]
-						loc += 1
-						if loc != len(self._stack):
+					if forward:																		# [a b][i] [t]
+						beam = -beam*interfacialMatrix[loc+1][1,0]/interfacialMatrix[loc+1][1,1]	# [c d][r] [0]
+						forward = False
+						if(loc != -1):
+							beam /= propagationMatrix[loc][1,1]										# [a 0]  [0] [0]
+							loc -= 1																# [0 a/] [0] [i]
+							continue
+						else:
+							break
+					else:																			# [a b][0] [r]
+						beam = interfacialMatrix[loc+1][0,1]*beam/interfacialMatrix[loc+1][1,1]		# [c d][t] [i]
+						forward = True
+						if(loc != len(self._stack)):
 							beam *= propagationMatrix[loc][0,0]
-					else:
-						beam = beam/interfacialMatrix[loc+1][1,1]
-						loc -= 1
-						if loc != -1:
-							beam /= propagationMatrix[loc][1,1]
-					if (loc == -1 and (not forward)) or (loc == len(self._stack) and forward):
-						break
-				if (loc == -1 and (not forward)) or (loc == len(self._stack) and forward):
-					break
-				if forward:																		# [a b][i] [t]
-					beam = -beam*interfacialMatrix[loc+1][1,0]/interfacialMatrix[loc+1][1,1]	# [c d][r] [0]
-					forward = False
-					if(loc != -1):
-						beam /= propagationMatrix[loc][1,1]										# [a 0]  [0] [0]
-						loc -= 1																# [0 a/] [0] [i]
-						continue
-					else:
-						break
-				else:																			# [a b][0] [r]
-					beam = interfacialMatrix[loc+1][0,1]*beam/interfacialMatrix[loc+1][1,1]		# [c d][t] [i]
-					forward = True
-					if(loc != len(self._stack)):
-						beam *= propagationMatrix[loc][0,0]
-						loc += 1
-						continue
-					else:
-						break
+							loc += 1
+							continue
+						else:
+							break
 
-			beams.append(beam)
+				beams.append(beam)
 
-		return _np.array(beams)
+			ret.append(beams)
+
+		return _np.squeeze(_np.array(ret))
 
 
 if __name__ == '__main__':
