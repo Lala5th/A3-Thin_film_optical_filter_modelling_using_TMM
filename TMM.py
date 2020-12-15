@@ -91,11 +91,14 @@ class TransferMatrix:
 			return (C - 1/C)/2
 
 		if p:
-			return _np.array([[Xp(True),Xp(False)],
-							  [Xp(False),Xp(True)]])
+			Xpos = Xp(True)
+			Xneg = Xp(False)
+		else:
+			Xpos = Xs(True)
+			Xneg = Xs(False)
 
-		return _np.array([[Xs(True),Xs(False)],
-						  [Xs(False),Xs(True)]])
+		return _np.array([[Xpos,Xneg],
+						  [Xneg,Xpos]])
 
 	def getTotalTransferMatrix(self,l,theta,p):
 		'''The method to compile the total transfer matrix of the system'''
