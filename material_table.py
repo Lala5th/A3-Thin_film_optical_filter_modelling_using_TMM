@@ -128,8 +128,47 @@ class MaterialTable:
 		'''Constructor that allows the creation of a theoretical material
 		with complex refractive index realN + 1j*Ec.'''
 		material = cls()
+
+		if (realN < 0) or (Ec < 0):
+			raise ValueError('Refractive index and extinction coefficient must \
+			be positive.')
+
 		material.getRealN = lambda l : realN
 		material.getEc = lambda l : Ec
+		return material
+
+	@classmethod
+	def fromArray(cls,wavelength,realN,Ec=0):
+		'''Constructor that allows the creation of a theoretical material
+		with complex refractive index realN(lambda) + 1j*Ec(lambda).
+		RealN and Ec are data for n and Ec at wavelength. Ec and realN can be
+		a single number'''
+		material = cls()
+
+		realN = _np.array(realN,ndmin=1)
+		Ec = _np.array(Ec,ndmin=1)
+		wavelength = _np.array(wavelength,ndmin=1)
+
+		if (len(wavelength) != len(realN) and len(realN)!=1):
+			raise ValueError('Wavelength and real refractive index must be \
+			the same size, or refractive index must be scalar.')
+
+		if (len(wavelength) != len(Ec) and len(Ec)!=1):
+			raise ValueError('Wavelength and extinction coefficient must be \
+			the same size, or refractive index must be scalar.')
+
+		if (realN < 0).any() or (Ec < 0).any():
+			raise ValueError('Refractive index and extinction coefficient must \
+			be positive.')
+
+		if (len(Ec) == 1):
+			material.getRealN = lambda l : realN[0]
+		else:
+			material.getRealN = _interp1d(wavelengths,realN)
+		if (len(Ec) == 1):
+			material.getEc = lambda l : Ec[0]
+		else:
+			material.getEc = _interp1d(wavelengths,Ec)
 		return material
 
 	@classmethod
@@ -137,6 +176,10 @@ class MaterialTable:
 		'''A constructor that allows the loading of a csv datafile.'''
 
 		material = cls()
+
+		if (data < 0).any():
+			raise ValueError('Refractive index and extinction coefficient must \
+			be positive, as well as wavelength.')
 
 		data = _np.loadtxt(fname,skiprows=skiprows,delimiter=delimiter)
 		data[:,0]*=wavelength_multiplier
