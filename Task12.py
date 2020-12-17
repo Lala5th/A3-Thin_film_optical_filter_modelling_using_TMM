@@ -13,8 +13,6 @@ BK7 = MaterialTable.fromMaterial('BK7',0.4,1)
 MgF2 = MaterialTable.fromMaterial('MgF2',0.4,1)
 Ta2O5 = MaterialTable.fromMaterial('Ta2O5',0.4,1)
 
-#MgF2.getEc = lambda l : 0
-#Ta2O5.getEc = lambda l : 0
 wl = _np.arange(0.4,1,0.001)
 
 def getThicknesses(l=0.5,periods = 2):
@@ -37,7 +35,15 @@ def getThicknesses(l=0.5,periods = 2):
 
 
 fig2 = plt.figure()
-stack,d = getThicknesses(0.6,10)
+i = 1
+while True:
+	stack,d = getThicknesses(0.633,i)
+	RT = TransferMatrix(stack,d).solveTransmission(0.633,0,True)
+	Rprime = RT[0]/(RT[0]+RT[1])
+	if Rprime > 0.9999:
+		print(Rprime,'at',i)
+		break
+	i += 1
 transmissions = TransferMatrix(stack,d).solveTransmission(wl,0,True)
 reflectance = transmissions[:,0]/(transmissions[:,0] + transmissions[:,1])
 plt.plot(wl,reflectance)
@@ -45,3 +51,12 @@ plt.ylabel('Reflectance')
 plt.xlabel("$\lambda$ [$\mu$m]")
 plt.ylim([0,1])
 plt.show()
+
+# Task 15
+
+Au = MaterialTable.fromMaterial('Au')
+
+phase = _np.angle(TransferMatrix(stack,d).solveTransmission(0.633,0,True,True)[0])
+phase_Au = _np.angle(TransferMatrix([air,Au]).solveTransmission(0.633,0,True,True)[0])
+
+print(phase,':',phase_Au)

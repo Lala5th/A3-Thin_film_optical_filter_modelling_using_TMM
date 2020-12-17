@@ -13,7 +13,7 @@ BK7 = _mtbl.MaterialTable.fromMaterial('BK7')
 
 transferredI = []
 wavelengths = _np.arange(0.4,1,0.001)
-for i in range(1,11):
+for i in range(1,21):
 	TM = TransferMatrix([air,gold,BK7],i*10*1e-3)
 	transferredI.append([i*10,TM.solveTransmission(wavelengths,0,True)])
 
@@ -25,6 +25,7 @@ for i in range(len(transferredI)):
 plt.legend()
 plt.ylabel('Transmittance')
 plt.xlabel("$\lambda$ [$\mu$m]")
+plt.yscale('log')
 plt.show()
 plt.figure()
 for i in range(len(transferredI)):
