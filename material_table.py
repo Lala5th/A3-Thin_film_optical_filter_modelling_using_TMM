@@ -5,6 +5,7 @@ import numpy as _np
 import re as _re
 from scipy.interpolate import interp1d as _interp1d
 import scipy.constants as _const
+import os as _os
 
 class MaterialTable:
 	'''This class initialises the database, while offering access to specific
@@ -19,19 +20,50 @@ class MaterialTable:
 	def initDatabase(reload=False):
 		'''This method loads the map for the database'''
 
+		filedir = _os.path.dirname(__file__)
+		filename = _os.path.join(filedir, './database/parsed_lib.yml')
+
 		if MaterialTable.library != None and reload:
 			print("Reloading database mapping file.")
 		elif MaterialTable.library != None:
 			return # exit if reload is not required.
 
 		try:
-			with open(r'./database/parsed_lib.yml') as file:
+			with open(filename) as file:
 
 				# Loading yml mapping.
 				MaterialTable.library = _yml.full_load(file)
 
 		except FileNotFoundError:
-			print('Library file at ./database/parsed_lib.yml was not found')
+			raise FileNotFoundError('Library file at ./database/parsed_lib.yml was not found')
+
+	@classmethod
+	def fromFormula(cls,formula,c,limits=[-_np.inf,_np.inf],Ec=lambda l : 0):
+		'''Constructor for creating material from given dispersion formula.
+		formula can be either an id (as defined by the refractiveIndex.info
+		database) or a recognised name. The limits for the validity of the
+		data can also be supplied in limits as an array of [lower, upper].
+		Ec is accepted as a function of wavelength, with the default of
+		constant 0.'''
+
+		table = cls() #initialise an empty MaterialTable named table
+
+		formulae_names = ['sellmeier', 'sellmeier2', 'polynomial',
+						  'refractiveIndexInfo', 'cauchy', 'gases',
+						  'herzberger', 'retro', 'exotic']
+
+		# Use subsequent ifs to avoid undefined behaviour
+		if type(formula) == str:
+			if formula.lower() in formulae_names:
+				formula = formulae_names.index(formula.lower()) + 1
+
+		if not (formula in range(1,10)):
+			raise ValueError(f'Formula {formula} not recognised')
+
+		table.getEc = Ec
+		table.getRealN = MaterialTable.formulae[formula](c,limits)
+
+		return table
 
 	@classmethod
 	def fromYml(cls,fname):
@@ -177,12 +209,12 @@ class MaterialTable:
 
 		material = cls()
 
+		data = _np.loadtxt(fname,skiprows=skiprows,delimiter=delimiter)
+		data[:,0]*=wavelength_multiplier
+
 		if (data < 0).any():
 			raise ValueError('Refractive index and extinction coefficient must \
 			be positive, as well as wavelength.')
-
-		data = _np.loadtxt(fname,skiprows=skiprows,delimiter=delimiter)
-		data[:,0]*=wavelength_multiplier
 
 		print('Loaded',fname)
 		print('Dataset range:',data[0,0],'um -',data[-1,0],'um')
@@ -612,6 +644,8 @@ def getWavenumber(l):
 	'''A function for transforming wavelength in um to wavenumber
 	in um^-1'''
 	return 2*_const.pi/l
+
+__all__ = ['MaterialTable', 'getWavenumber']
 
 if __name__ == '__main__':
 

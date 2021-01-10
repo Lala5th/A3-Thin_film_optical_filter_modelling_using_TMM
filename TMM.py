@@ -108,8 +108,8 @@ class TransferMatrix:
 		transferMatrix = _np.array([[1,0],[0,1]])
 		transferMatrix = transferMatrix @ self.getInterfacialMatrix(-1,l,theta,p,k0)
 		for i in range(len(self._stack)):
-			transferMatrix = transferMatrix @ self.getPropagationMatrix(i,l,theta,k0)
-			transferMatrix = transferMatrix @ self.getInterfacialMatrix(i,l,theta,p,k0)
+			transferMatrix =  self.getPropagationMatrix(i,l,theta,k0) @ transferMatrix
+			transferMatrix = self.getInterfacialMatrix(i,l,theta,p,k0) @ transferMatrix
 
 		return transferMatrix
 
@@ -149,6 +149,96 @@ class TransferMatrix:
 		ret = _np.array(ret)
 		return _np.squeeze(ret)
 
+	def getIntensityProfile(self,lambdas,thetas,ps,xs=None,function=True,complex=False):
+		'''A function for returning the intensity at a given depth within the stack.
+		It returns the wave intensity/amplitude for a given depth x within the
+		stack. It can also be asked to return a function that can be used to get
+		these values for a given x later on.'''
+
+		interface_locations = [sum(self._stack[:i,1]) for i in range(len(self._stack)+1)]
+
+		def	getInterface(depth):
+			ret = 0
+			for i,loc in enumerate(interface_locations):
+				if depth <= loc:
+					break
+				ret = i
+			return ret
+
+		# Function to generate output function
+		# Must be nested otherwise namespaces are messed up
+		def getFunction(layerbeams,ks):
+			def func(depth):
+				# Get location within stack and layer
+				i = getInterface(depth)
+				k = ks[i]
+				distance = depth - interface_locations[i]
+				propagation = _np.array([[_np.exp(1j*k*distance),0],
+										 [0,_np.exp(-1j*k*distance)]])
+				beam = propagation @ layerbeams[i] # This is fine as propagation is diagonal
+
+				if complex:
+					return beam
+				return _np.real(beam)**2 + _np.imag(beam)**2
+			return func
+
+		lambdas = _np.array(lambdas,ndmin=1)
+		thetas = _np.array(thetas,ndmin=1)
+		ps = _np.array(ps,ndmin=1)
+		xs = _np.array(xs,ndmin=1)
+
+		funcs = []
+
+		for l in lambdas:
+			thetaVals = []
+
+			for theta in thetas:
+				pVals = []
+
+				for p in ps:
+
+					propagationMatrix = [self.getPropagationMatrix(i,l,theta) for i in range(len(self._stack))]
+					interfacialMatrix = [self.getInterfacialMatrix(i,l,theta,p) for i in range(-1,len(self._stack))]
+					kzs = [self.getKz(i,l,theta) for i in range(len(self._stack)+1)]
+
+					r,t = self.solveTransmission(l,theta,p,complex=True)
+					a = [1,r] # The beam at incidence
+
+					# Get the partial values for the beams at the interfaces
+					# This speeds up calculations if in function mode, but can
+					# be slow if only a single value is needed from the top of
+					# the stack.
+					a = interfacialMatrix[0] @ a
+					interface_beams = [a]
+					for i in range(len(self._stack)):
+						a = a @ propagationMatrix[i]
+						a = a @ interfacialMatrix[i+1]
+						interface_beams.append(a)
+					pVals.append(getFunction(interface_beams,kzs))
+				thetaVals.append(pVals)
+			funcs.append(thetaVals)
+
+		if function:
+			return _np.squeeze(_np.array(funcs))
+
+		# Calculate the actual values
+		ret = []
+		for i in funcs:
+			jval = []
+			for j in i:
+				kval = []
+				for k in j:
+					xval = []
+					for x in xs:
+						xval.append(k(x))
+					kval.append(xval)
+				jval.append(kval)
+			ret.append(jval)
+		return _np.squeeze(_np.array(ret))
+
+
+
+
 	def trackSingleBeam(self,interfaces,lambdas,theta,p):
 		'''Tracks a single beam through the stack. The interfaces array
 		contains the interfaces on which it reflects.'''
@@ -165,9 +255,9 @@ class TransferMatrix:
 			forward = True # Whether the beam is forward propagating
 			for i in interface:
 				if forward and prev >= i:
-					raise ValueError('Unable to perform calculation. No route found')
+					raise ValueError(f'Unable to perform calculation. Invalid route: {interface}')
 				elif not forward and prev <= i:
-					raise ValueError('Unable to perform calculation. No route found')
+					raise ValueError(f'Unable to perform calculation. Invalid route: {interface}')
 				prev = i
 				forward = not forward
 
@@ -208,12 +298,14 @@ class TransferMatrix:
 							break
 					if (loc == -1 and (not forward)) or (loc == len(self._stack) and forward):
 						break
+					# If it was forward propagating then after the reflection
+					# it will propagate backward so proper solutions used
 					if forward:																		# [a b][i] [t]
 						beam = -beam*interfacialMatrix[loc+1][1,0]/interfacialMatrix[loc+1][1,1]	# [c d][r] [0]
 						forward = False
 						if(loc != -1):
 							beam /= propagationMatrix[loc][1,1]										# [a 0]  [0] [0]
-							loc -= 1																# [0 a/] [0] [i]
+							loc -= 1																# [0 a/] [t] [i]
 							continue
 						else:
 							break
@@ -227,11 +319,20 @@ class TransferMatrix:
 						else:
 							break
 
+				# Get final interface transmission
+				if forward:
+					r = -beam*interfacialMatrix[len(self._stack)-1][1,0]/interfacialMatrix[len(self._stack)-1][1,1]
+					beam = beam*interfacialMatrix[len(self._stack)-1][0,0] + r*interfacialMatrix[len(self._stack)-1][0,1]
+				else:
+					beam = beam/interfacialMatrix[0][1,1]
+
 				beams.append(beam)
 
 			ret.append(beams)
 
 		return _np.squeeze(_np.array(ret))
+
+__all__ = ['TransferMatrix']
 
 
 if __name__ == '__main__':

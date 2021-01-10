@@ -20,7 +20,7 @@ ds = _np.arange(0.01,0.2,0.001)
 
 wl = _np.arange(0.4,1,0.001)
 
-phases = _np.array(_np.mod([[_np.angle(TransferMatrix(stack,[d]*4).trackSingleBeam([-1,0,1,2,3],w,0,False)) for w in wl] for d in ds],_const.pi))
+phases = _np.array(_np.mod([[_np.angle(TransferMatrix(stack,[d]*4).trackSingleBeam([-1,0,1,2,3],w,0,False)) for w in wl] for d in ds],2*_const.pi))
 
 fig,ax = plt.subplots()
 plt.subplots_adjust(left=0.25, bottom=0.25)
