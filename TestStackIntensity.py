@@ -17,7 +17,7 @@ wl = _np.arange(0.4,1,0.001)
 
 
 depths = _np.linspace(0,6,1000)
-Is = TransferMatrix([a] + [a]*2 + [b]*30 + [b],[1]*2 + [0.1]*30).getIntensityProfile(wl,0,False,xs=depths,function=False)
+Is = TransferMatrix([a] + [a]*2 + [b]*30 + [b],[1]*2 + [0.1]*30).getIntensityProfile(wl,0,False,zs=depths,function=False)
 cmap = plt.get_cmap('gnuplot')
 norm = colors.LogNorm()
 plt.figure()

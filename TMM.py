@@ -149,7 +149,7 @@ class TransferMatrix:
 		ret = _np.array(ret)
 		return _np.squeeze(ret)
 
-	def getIntensityProfile(self,lambdas,thetas,ps,xs=None,function=True,complex=False):
+	def getIntensityProfile(self,lambdas,thetas,ps,zs=None,function=True,complex=False):
 		'''A function for returning the intensity at a given depth within the stack.
 		It returns the wave intensity/amplitude for a given depth x within the
 		stack. It can also be asked to return a function that can be used to get
@@ -185,7 +185,7 @@ class TransferMatrix:
 		lambdas = _np.array(lambdas,ndmin=1)
 		thetas = _np.array(thetas,ndmin=1)
 		ps = _np.array(ps,ndmin=1)
-		xs = _np.array(xs,ndmin=1)
+		zs = _np.array(zs,ndmin=1)
 
 		funcs = []
 
@@ -228,10 +228,10 @@ class TransferMatrix:
 			for j in i:
 				kval = []
 				for k in j:
-					xval = []
-					for x in xs:
-						xval.append(k(x))
-					kval.append(xval)
+					zval = []
+					for z in zs:
+						zval.append(k(z))
+					kval.append(zval)
 				jval.append(kval)
 			ret.append(jval)
 		return _np.squeeze(_np.array(ret))

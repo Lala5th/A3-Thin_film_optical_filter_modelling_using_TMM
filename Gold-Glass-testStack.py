@@ -17,8 +17,8 @@ Au = MaterialTable.fromMaterial('Au',0.4,1)
 wl = _np.arange(0.4,1,0.001)
 
 
-depths = _np.linspace(0,6,1000)
-Is = TransferMatrix([air] + [BK7,Au]*5 + [BK7],[1,0.01]*5).getIntensityProfile(wl,0,False,xs=depths,function=False)
+depths = _np.linspace(0,11,1000)
+Is = TransferMatrix([air] + [BK7,Au]*5 + [BK7],[0.5,0.1]*5).getIntensityProfile(wl,0,False,zs=depths,function=False)
 cmap = plt.get_cmap('gnuplot')
 norm = colors.LogNorm()
 plt.figure()

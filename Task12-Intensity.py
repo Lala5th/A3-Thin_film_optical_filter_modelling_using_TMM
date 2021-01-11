@@ -55,7 +55,7 @@ plt.ylim([0,1])
 plt.show()
 
 depths = _np.linspace(0,3,1000)
-Is = TransferMatrix(stack,d).getIntensityProfile(wl,0,False,xs=depths,function=False)
+Is = TransferMatrix(stack,d).getIntensityProfile(wl,0,False,zs=depths,function=False)
 cmap = plt.get_cmap('gnuplot')
 norm = colors.LogNorm()
 plt.figure()

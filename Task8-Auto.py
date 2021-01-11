@@ -13,11 +13,11 @@ BK7 = _mtbl.MaterialTable.fromMaterial('BK7')
 # Task 8
 plt.ion()
 
-fitfunc = lambda l, n, d : TransferMatrix([air,_mtbl.MaterialTable.fromValue(n),BK7],_np.abs(d)).solveTransmission(wls,0,False)[:,0]
+fitfunc = lambda l, d : TransferMatrix([air,_mtbl.MaterialTable.fromValue(1.24),BK7],_np.abs(d)).solveTransmission(wls,0,False)[:,0]
 
 wls = _np.arange(0.4,1,0.005)
 
-fit, cov = curve_fit(fitfunc,wls,0,p0=[1.24,0.14])
+fit, cov = curve_fit(fitfunc,wls,0,p0=[0.14])
 
 fig,ax = plt.subplots()
 plt.subplots_adjust(left=0.25, bottom=0.25)
