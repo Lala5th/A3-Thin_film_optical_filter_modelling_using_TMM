@@ -319,13 +319,6 @@ class TransferMatrix:
 						else:
 							break
 
-				# Get final interface transmission
-				if forward:
-					r = -beam*interfacialMatrix[len(self._stack)-1][1,0]/interfacialMatrix[len(self._stack)-1][1,1]
-					beam = beam*interfacialMatrix[len(self._stack)-1][0,0] + r*interfacialMatrix[len(self._stack)-1][0,1]
-				else:
-					beam = beam/interfacialMatrix[0][1,1]
-
 				beams.append(beam)
 
 			ret.append(beams)
@@ -359,6 +352,7 @@ if __name__ == '__main__':
 	print('Single reflection BK7 substrate:',end='')
 	TM0 = TransferMatrix([vacuum,BK7],[])
 	test(TM0.solveTransmission(0.5,0,True)[0],_np.abs(TM0.trackSingleBeam(-1,0.5,0,True))**2)
+	print (TM0.solveTransmission(0.5,0,True)[0],_np.abs(TM0.trackSingleBeam(-1,0.5,0,True))**2)
 	print('Single reflection BK7 substrate, vacuum layer:',end='')
 	TM1 = TransferMatrix([vacuum,vacuum,BK7],[1])
 	test(TM1.solveTransmission(0.5,0,True)[0],_np.abs(TM1.trackSingleBeam(0,0.5,0,True))**2)
