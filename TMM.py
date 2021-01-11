@@ -51,7 +51,7 @@ class TransferMatrix:
 		for large stacks'''
 		if k0 == None:
 			k0 = _mtbl.getWavenumber(l)
-		kx = k0*_np.sin(theta)
+		kx = k0*self.getLayer(i)[0].getN(l)*_np.sin(theta)
 		return _np.sqrt(k0**2*self.getLayer(i)[0].getN(l)**2-kx**2)
 
 	def getPropagationMatrix(self,i,l,theta,k0=None):
