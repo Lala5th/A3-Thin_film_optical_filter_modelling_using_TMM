@@ -230,7 +230,7 @@ class MaterialTable:
 			material.getRealN = _interp1d(data[:,0],data[:,1])
 		else:
 			material.getRealN = _interp1d(data[:,0],data[:,1])
-			material.getEc = _interp1d(data[:,0],data[:,2]*wavelength_multiplier)
+			material.getEc = _interp1d(data[:,0],data[:,2])
 		return material
 
 	@classmethod
