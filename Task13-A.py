@@ -15,7 +15,7 @@ BK7 = MaterialTable.fromMaterial('BK7',0.4,1)
 MgF2 = MaterialTable.fromMaterial('MgF2',0.4,1)
 Ta2O5 = MaterialTable.fromMaterial('Ta2O5',0.4,1)
 
-wl = _np.arange(0.4,1,0.001)
+wl = _np.arange(0.4,1,0.005)
 
 def getThicknesses(l=0.5,periods = 2):
 	widths = []
@@ -34,9 +34,6 @@ def getThicknesses(l=0.5,periods = 2):
 
 	return (stack,widths)
 
-
-
-fig2 = plt.figure()
 i = 1
 while True:
 	stack,d = getThicknesses(0.633,i)
@@ -46,25 +43,18 @@ while True:
 		print(Rprime,'at',i)
 		break
 	i += 1
-transmissions = TransferMatrix(stack,d).solveTransmission(wl,0,True)
-reflectance = transmissions[:,0]/(transmissions[:,0] + transmissions[:,1])
-plt.plot(wl,reflectance)
-plt.ylabel('Reflectance')
-plt.xlabel("$\lambda$ [$\mu$m]")
-plt.ylim([0,1])
-plt.show()
 
-depths = _np.linspace(0,3,1000)
-Is = TransferMatrix(stack,d).getIntensityProfile(wl,0,False,zs=depths,function=False)
+thetas = _np.linspace(0,_const.pi/2,25)[:-2] # fix so 1/0 doesnt happen
+T = TransferMatrix(stack,d).solveTransmission(wl,thetas,[True,False])
+
 cmap = plt.get_cmap('gnuplot')
-norm = colors.LogNorm()
 fig, (ax1,ax2) = plt.subplots(2,1,sharex=True)
-pc = ax1.pcolormesh(wl,depths,Is[:,:,0].transpose(),cmap=cmap,norm=norm)
-pc = ax2.pcolormesh(wl,depths,Is[:,:,1].transpose(),cmap=cmap,norm=norm)
-ax1.set_ylabel("z [$\mu$m]")
-ax2.set_ylabel("z [$\mu$m]")
+pc = ax1.pcolormesh(wl,thetas,T[:,:,0,0].transpose(),cmap=cmap)
+ax1.set_ylabel("$\\theta$ [rad]")
+pc = ax2.pcolormesh(wl,thetas,T[:,:,1,0].transpose(),cmap=cmap)
 ax2.set_xlabel("$\lambda$ [$\mu$m]")
 ax2.set_xlim([0.4,1])
+ax2.set_ylabel("$\\theta$ [rad]")
 fig.subplots_adjust(right=0.8)
 cax = fig.add_axes([0.85, 0.15, 0.05, 0.7])
 fig.colorbar(pc,cax=cax)

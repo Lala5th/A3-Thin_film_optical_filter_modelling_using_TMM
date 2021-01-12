@@ -16,14 +16,20 @@ air = MaterialTable.fromMaterial('air')
 
 TM = TransferMatrix([air,AlAs,SiO2,air],[0.01,0.25])
 
-wl = _np.arange(0.4,1,0.001)
 ref = _np.loadtxt('air-AlAs_10-SiO2_250-air.csv',skiprows=1,delimiter='\t')
 ref[:,0]*=1e-3
-reference = interp1d(ref[:,0],ref[:,1])
+wl = ref[:,0]
 
 r,t = TM.solveTransmission(wl,0,True).transpose()
-plt.plot(wl,t-reference(wl))
-plt.ylabel('Difference')
-plt.xlabel("$\lambda$ [$\mu$m]")
-plt.ylim([-1e-2,1e-2])
+fig, (ax1,ax2) = plt.subplots(2,1,sharex=True)
+ax2.plot(wl,t-ref[:,1])
+ax2.set_ylabel('Difference [a.u.]')
+ax2.set_ylim([-5e-4,5e-4])
+ax1.plot(wl,ref[:,1])
+ax1.plot(wl,t)
+ax1.set_ylabel('Transmittance [a.u.]')
+ax2.set_xlabel("$\lambda$ [$\mu$m]")
+ax1.set_ylim([0.5,1])
+ax2.grid()
+ax1.grid()
 plt.show()
